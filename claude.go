@@ -3,8 +3,11 @@ package aibot
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/google/uuid"
 )
@@ -93,10 +96,22 @@ func (c *ClaudeBot) SendMessage(conversationId, text string) (*ClaudeReader, err
 	}
 	req.Header.Set("Cookie", c.Cookie)
 	req.Header.Set("Content-type", "application/json")
-	req.Header.Set("acccpt", "text/event-stream")
+	req.Header.Set("Acccpt", "text/event-stream")
+	c.client.Transport = &http.Transport{
+		Proxy: func(r *http.Request) (*url.URL, error) {
+			return url.Parse("http://127.0.0.1:7890")
+		},
+	}
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.Header.Get("content-type") != "text/event-stream" {
+		data, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		log.Println(string(data))
+		return nil, fmt.Errorf("content-type is not text/event-stream")
 	}
 	return &ClaudeReader{NewDecoder(resp.Body)}, err
 }
